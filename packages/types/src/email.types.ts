@@ -83,5 +83,6 @@ export interface EmailDocument {
 	}[];
 	timestamp: number;
 	ingestionSourceId: string;
-	// other metadata
+	hasAttachments: boolean;
+	tags: string[];
 }

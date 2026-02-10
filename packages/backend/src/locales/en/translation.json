@@ -52,7 +52,10 @@
 		"notFound": "Archived email not found"
 	},
 	"search": {
-		"keywordsRequired": "Keywords are required"
+		"keywordsRequired": "Keywords are required",
+		"invalidRequestBody": "Invalid search request body",
+		"savedSearchNotFound": "Saved search not found",
+		"savedSearchNameRequired": "Name and query are required to save a search"
 	},
 	"storage": {
 		"filePathRequired": "File path is required",

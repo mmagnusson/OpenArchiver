@@ -25,3 +25,61 @@ export interface SearchResult {
 	totalPages: number;
 	processingTimeMs: number;
 }
+
+// --- Advanced Search Types ---
+
+export interface AdvancedSearchQuery {
+	query?: string;
+	filters?: AdvancedSearchFilters;
+	facets?: string[];
+	sort?: string;
+	page?: number;
+	limit?: number;
+	matchingStrategy?: MatchingStrategy;
+}
+
+export interface AdvancedSearchFilters {
+	from?: string;
+	to?: string;
+	cc?: string;
+	bcc?: string;
+	dateFrom?: string;
+	dateTo?: string;
+	hasAttachments?: boolean;
+	ingestionSourceId?: string;
+	tags?: string[];
+}
+
+export interface FacetDistribution {
+	[attribute: string]: Record<string, number>;
+}
+
+export interface FacetStats {
+	[attribute: string]: { min: number; max: number };
+}
+
+export interface AdvancedSearchResult extends SearchResult {
+	facetDistribution?: FacetDistribution;
+	facetStats?: FacetStats;
+}
+
+// --- Saved Search Types ---
+
+export interface SavedSearch {
+	id: string;
+	userId: string;
+	name: string;
+	query: AdvancedSearchQuery;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface CreateSavedSearchDto {
+	name: string;
+	query: AdvancedSearchQuery;
+}
+
+export interface UpdateSavedSearchDto {
+	name?: string;
+	query?: AdvancedSearchQuery;
+}

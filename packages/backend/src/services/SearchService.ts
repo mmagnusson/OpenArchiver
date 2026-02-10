@@ -3,6 +3,8 @@ import { config } from '../config';
 import type {
 	SearchQuery,
 	SearchResult,
+	AdvancedSearchQuery,
+	AdvancedSearchResult,
 	EmailDocument,
 	TopSender,
 	User,
@@ -127,6 +129,115 @@ export class SearchService {
 		};
 	}
 
+	public async searchEmailsAdvanced(
+		dto: AdvancedSearchQuery,
+		userId: string,
+		actorIp: string
+	): Promise<AdvancedSearchResult> {
+		const {
+			query = '',
+			filters,
+			facets,
+			sort,
+			page = 1,
+			limit = config.meili.searchDefaultLimit,
+			matchingStrategy = 'last',
+		} = dto;
+
+		const clampedLimit = Math.min(limit, config.meili.searchMaxLimit);
+		const index = await this.getIndex<EmailDocument>('emails');
+
+		const searchParams: SearchParams = {
+			limit: clampedLimit,
+			offset: (page - 1) * clampedLimit,
+			attributesToHighlight: ['*'],
+			attributesToCrop: ['body'],
+			cropLength: config.meili.cropLength,
+			showMatchesPosition: true,
+			sort: [sort || 'timestamp:desc'],
+			matchingStrategy,
+		};
+
+		// Build filter string from structured filters
+		const filterParts: string[] = [];
+		if (filters) {
+			if (filters.from) filterParts.push(`from = "${filters.from}"`);
+			if (filters.to) filterParts.push(`to = "${filters.to}"`);
+			if (filters.cc) filterParts.push(`cc = "${filters.cc}"`);
+			if (filters.bcc) filterParts.push(`bcc = "${filters.bcc}"`);
+			if (filters.dateFrom) {
+				const ts = new Date(filters.dateFrom).getTime();
+				if (!isNaN(ts)) filterParts.push(`timestamp >= ${ts}`);
+			}
+			if (filters.dateTo) {
+				const ts = new Date(filters.dateTo).getTime();
+				if (!isNaN(ts)) filterParts.push(`timestamp <= ${ts}`);
+			}
+			if (filters.hasAttachments !== undefined) {
+				filterParts.push(`hasAttachments = ${filters.hasAttachments}`);
+			}
+			if (filters.ingestionSourceId) {
+				filterParts.push(`ingestionSourceId = "${filters.ingestionSourceId}"`);
+			}
+			if (filters.tags && filters.tags.length > 0) {
+				const tagFilters = filters.tags.map((t) => `tags = "${t}"`);
+				filterParts.push(`(${tagFilters.join(' OR ')})`);
+			}
+		}
+
+		if (filterParts.length > 0) {
+			searchParams.filter = filterParts.join(' AND ');
+		}
+
+		// Inject CASL access-control filter
+		const { searchFilter } = await FilterBuilder.create(userId, 'archive', 'read');
+		if (searchFilter) {
+			if (searchParams.filter) {
+				searchParams.filter = `${searchParams.filter} AND ${searchFilter}`;
+			} else {
+				searchParams.filter = searchFilter;
+			}
+		}
+
+		// Request facets if specified
+		if (facets && facets.length > 0) {
+			searchParams.facets = facets;
+		}
+
+		const searchResults = await index.search(query, searchParams);
+
+		await this.auditService.createAuditLog({
+			actorIdentifier: userId,
+			actionType: 'SEARCH',
+			targetType: 'ArchivedEmail',
+			targetId: '',
+			actorIp,
+			details: {
+				query,
+				filters,
+				facets,
+				sort,
+				page,
+				limit: clampedLimit,
+				matchingStrategy,
+				advanced: true,
+			},
+		});
+
+		return {
+			hits: searchResults.hits,
+			total: searchResults.estimatedTotalHits ?? searchResults.hits.length,
+			page,
+			limit: clampedLimit,
+			totalPages: Math.ceil(
+				(searchResults.estimatedTotalHits ?? searchResults.hits.length) / clampedLimit
+			),
+			processingTimeMs: searchResults.processingTimeMs,
+			facetDistribution: searchResults.facetDistribution,
+			facetStats: searchResults.facetStats,
+		};
+	}
+
 	public async getTopSenders(limit = 10): Promise<TopSender[]> {
 		const index = await this.getIndex<EmailDocument>('emails');
 		const searchResults = await index.search('', {
@@ -160,6 +271,7 @@ export class SearchService {
 				'attachments.filename',
 				'attachments.content',
 				'userEmail',
+				'tags',
 			],
 			filterableAttributes: [
 				'from',
@@ -169,6 +281,8 @@ export class SearchService {
 				'timestamp',
 				'ingestionSourceId',
 				'userEmail',
+				'hasAttachments',
+				'tags',
 			],
 			sortableAttributes: ['timestamp'],
 		});

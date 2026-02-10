@@ -1,43 +1,19 @@
 import type { PageServerLoad, RequestEvent } from './$types';
 import { api } from '$lib/server/api';
-import type { SearchResult } from '@open-archiver/types';
+import type {
+	AdvancedSearchResult,
+	AdvancedSearchQuery,
+	MatchingStrategy,
+	SavedSearch,
+} from '@open-archiver/types';
 
-import type { MatchingStrategy } from '@open-archiver/types';
-
-async function performSearch(
-	keywords: string,
-	page: number,
-	matchingStrategy: MatchingStrategy,
-	event: RequestEvent
-) {
-	if (!keywords) {
-		return { searchResult: null, keywords: '', page: 1, matchingStrategy: 'last' };
-	}
-
+async function loadSavedSearches(event: RequestEvent): Promise<SavedSearch[]> {
 	try {
-		const response = await api(
-			`/search?keywords=${keywords}&page=${page}&limit=10&matchingStrategy=${matchingStrategy}`,
-			event,
-			{
-				method: 'GET',
-			}
-		);
-
-		if (!response.ok) {
-			const error = await response.json();
-			return { searchResult: null, keywords, page, matchingStrategy, error: error.message };
-		}
-
-		const searchResult = (await response.json()) as SearchResult;
-		return { searchResult, keywords, page, matchingStrategy };
-	} catch (error) {
-		return {
-			searchResult: null,
-			keywords,
-			page,
-			matchingStrategy,
-			error: error instanceof Error ? error.message : 'Unknown error',
-		};
+		const response = await api('/search/saved', event, { method: 'GET' });
+		if (response.ok) return (await response.json()) as SavedSearch[];
+		return [];
+	} catch {
+		return [];
 	}
 }
 
@@ -46,5 +22,99 @@ export const load: PageServerLoad = async (event) => {
 	const page = parseInt(event.url.searchParams.get('page') || '1');
 	const matchingStrategy = (event.url.searchParams.get('matchingStrategy') ||
 		'last') as MatchingStrategy;
-	return performSearch(keywords, page, matchingStrategy, event);
+
+	// Advanced filter params
+	const from = event.url.searchParams.get('from') || undefined;
+	const to = event.url.searchParams.get('to') || undefined;
+	const dateFrom = event.url.searchParams.get('dateFrom') || undefined;
+	const dateTo = event.url.searchParams.get('dateTo') || undefined;
+	const hasAttachmentsParam = event.url.searchParams.get('hasAttachments');
+	const ingestionSourceId =
+		event.url.searchParams.get('ingestionSourceId') || undefined;
+
+	const hasAdvancedFilters = !!(
+		from ||
+		to ||
+		dateFrom ||
+		dateTo ||
+		hasAttachmentsParam ||
+		ingestionSourceId
+	);
+
+	// If no search criteria, return initial state with saved searches
+	if (!keywords && !hasAdvancedFilters) {
+		const savedSearches = await loadSavedSearches(event);
+		return {
+			searchResult: null,
+			keywords: '',
+			page: 1,
+			matchingStrategy: 'last' as MatchingStrategy,
+			filters: {},
+			savedSearches,
+		};
+	}
+
+	// Build advanced search request body
+	const filters: AdvancedSearchQuery['filters'] = {};
+	if (from) filters.from = from;
+	if (to) filters.to = to;
+	if (dateFrom) filters.dateFrom = dateFrom;
+	if (dateTo) filters.dateTo = dateTo;
+	if (hasAttachmentsParam !== null && hasAttachmentsParam !== undefined) {
+		filters.hasAttachments = hasAttachmentsParam === 'true';
+	}
+	if (ingestionSourceId) filters.ingestionSourceId = ingestionSourceId;
+
+	const body: AdvancedSearchQuery = {
+		query: keywords,
+		page,
+		limit: 10,
+		matchingStrategy,
+		facets: ['from', 'hasAttachments', 'tags'],
+		filters:
+			Object.keys(filters).length > 0 ? filters : undefined,
+	};
+
+	try {
+		const response = await api('/search/advanced', event, {
+			method: 'POST',
+			body: JSON.stringify(body),
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			const savedSearches = await loadSavedSearches(event);
+			return {
+				searchResult: null,
+				keywords,
+				page,
+				matchingStrategy,
+				filters,
+				savedSearches,
+				error: error.message,
+			};
+		}
+
+		const searchResult = (await response.json()) as AdvancedSearchResult;
+		const savedSearches = await loadSavedSearches(event);
+		return {
+			searchResult,
+			keywords,
+			page,
+			matchingStrategy,
+			filters,
+			savedSearches,
+		};
+	} catch (error) {
+		const savedSearches = await loadSavedSearches(event);
+		return {
+			searchResult: null,
+			keywords,
+			page,
+			matchingStrategy,
+			filters,
+			savedSearches,
+			error: error instanceof Error ? error.message : 'Unknown error',
+		};
+	}
 };
