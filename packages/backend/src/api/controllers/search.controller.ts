@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { SearchService } from '../../services/SearchService';
 import { MatchingStrategies } from 'meilisearch';
-import { parseSearchQuery, filtersToMeiliString } from '../../services/QueryParser';
+import { parseSearchQuery, filterExpressionToMeiliString } from '../../services/QueryParser';
 import type { AdvancedSearchQuery } from '@open-archiver/types';
 
 export class SearchController {
@@ -32,22 +32,16 @@ export class SearchController {
 
 			// Parse keywords through QueryParser to extract field-specific filters
 			const parsed = parseSearchQuery(keywords as string);
-			const filters: Record<string, any> = {};
 
-			for (const f of parsed.filters) {
-				if (f.operator === 'eq') {
-					filters[f.field] = f.value;
-				}
-			}
-
-			// Build additional Meilisearch filter string for range operators
-			const rangeFilters = parsed.filters.filter((f) => f.operator !== 'eq');
-			const rangeFilterString = filtersToMeiliString(rangeFilters);
+			// Build filter string from the expression tree (includes range filters)
+			const filterString = parsed.filterExpression
+				? filterExpressionToMeiliString(parsed.filterExpression)
+				: undefined;
 
 			const results = await this.searchService.searchEmails(
 				{
 					query: parsed.keywords,
-					filters: Object.keys(filters).length > 0 ? filters : undefined,
+					filterString,
 					page: page ? parseInt(page as string) : 1,
 					limit: limit ? parseInt(limit as string) : 10,
 					matchingStrategy: matchingStrategy as MatchingStrategies,

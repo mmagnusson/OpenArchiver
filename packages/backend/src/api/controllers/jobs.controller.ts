@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { JobsService } from '../../services/JobsService';
-import {
+import type {
 	IGetQueueJobsRequestParams,
 	IGetQueueJobsRequestQuery,
 	JobStatus,
@@ -37,6 +37,32 @@ export class JobsController {
 			res.status(200).json(queueDetails);
 		} catch (error) {
 			res.status(500).json({ message: 'Error fetching queue jobs', error });
+		}
+	};
+
+	public clearQueueJobs = async (req: Request, res: Response) => {
+		try {
+			const { queueName } = req.params;
+			const { status } = req.query;
+
+			if (!status || typeof status !== 'string') {
+				res.status(400).json({ message: 'Missing required query parameter: status' });
+				return;
+			}
+
+			const validStatuses: JobStatus[] = ['completed', 'failed', 'delayed', 'waiting', 'paused'];
+			if (!validStatuses.includes(status as JobStatus)) {
+				res.status(400).json({
+					message: `Invalid status "${status}". Must be one of: ${validStatuses.join(', ')}`,
+				});
+				return;
+			}
+
+			const result = await this.jobsService.clearJobsByStatus(queueName, status as JobStatus);
+			res.status(200).json(result);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Error clearing queue jobs';
+			res.status(500).json({ message });
 		}
 	};
 }

@@ -80,6 +80,23 @@ export class JobsService {
 		};
 	}
 
+	public async clearJobsByStatus(
+		queueName: string,
+		status: JobStatus
+	): Promise<{ cleared: number }> {
+		const queue = this.queues.find((q) => q.name === queueName);
+		if (!queue) {
+			throw new Error(`Queue ${queueName} not found`);
+		}
+
+		// BullMQ's clean() expects the internal status name
+		const bulkStatus = status === 'waiting' ? 'wait' : status;
+
+		// grace period 0 = remove all jobs of this status regardless of age
+		const removed = await queue.clean(0, 0, bulkStatus);
+		return { cleared: removed.length };
+	}
+
 	private async formatJob(job: Job): Promise<IJob> {
 		const state = await job.getState();
 		return {

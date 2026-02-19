@@ -12,6 +12,7 @@ export default defineConfig({
 		'import.meta.env.VITE_ENTERPRISE_MODE': process.env.VITE_ENTERPRISE_MODE === 'true',
 	},
 	server: {
+		host: true,
 		port: Number(process.env.PORT_FRONTEND) || 3000,
 		proxy: {
 			'/api': {

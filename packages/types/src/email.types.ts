@@ -85,4 +85,5 @@ export interface EmailDocument {
 	ingestionSourceId: string;
 	hasAttachments: boolean;
 	tags: string[];
+	path: string;
 }

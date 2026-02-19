@@ -5,6 +5,7 @@ export type MatchingStrategy = 'last' | 'all' | 'frequency';
 export interface SearchQuery {
 	query: string;
 	filters?: Record<string, any>;
+	filterString?: string;
 	page?: number;
 	limit?: number;
 	matchingStrategy?: MatchingStrategy;
@@ -36,6 +37,7 @@ export interface AdvancedSearchQuery {
 	page?: number;
 	limit?: number;
 	matchingStrategy?: MatchingStrategy;
+	attachmentsOnly?: boolean;
 }
 
 export interface AdvancedSearchFilters {
@@ -48,6 +50,7 @@ export interface AdvancedSearchFilters {
 	hasAttachments?: boolean;
 	ingestionSourceId?: string;
 	tags?: string[];
+	path?: string;
 }
 
 export interface FacetDistribution {

@@ -11,6 +11,7 @@ import type {
 } from '@open-archiver/types';
 import { FilterBuilder } from './FilterBuilder';
 import { AuditService } from './AuditService';
+import { parseSearchQuery, filterExpressionToMeiliString } from './QueryParser';
 
 export class SearchService {
 	private client: MeiliSearch;
@@ -64,7 +65,7 @@ export class SearchService {
 		userId: string,
 		actorIp: string
 	): Promise<SearchResult> {
-		const { query, filters, page = 1, limit = 10, matchingStrategy = 'last' } = dto;
+		const { query, filters, filterString, page = 1, limit = 10, matchingStrategy = 'last' } = dto;
 		const index = await this.getIndex<EmailDocument>('emails');
 
 		const searchParams: SearchParams = {
@@ -76,7 +77,10 @@ export class SearchService {
 			matchingStrategy,
 		};
 
-		if (filters) {
+		if (filterString) {
+			// Use pre-built filter string (from QueryParser with boolean support)
+			searchParams.filter = filterString;
+		} else if (filters) {
 			const filterStrings = Object.entries(filters).map(([key, value]) => {
 				if (typeof value === 'string') {
 					return `${key} = '${value}'`;
@@ -135,14 +139,19 @@ export class SearchService {
 		actorIp: string
 	): Promise<AdvancedSearchResult> {
 		const {
-			query = '',
+			query: rawQuery = '',
 			filters,
 			facets,
 			sort,
 			page = 1,
 			limit = config.meili.searchDefaultLimit,
 			matchingStrategy = 'last',
+			attachmentsOnly,
 		} = dto;
+
+		// Parse the query string to extract boolean field filters
+		const parsed = parseSearchQuery(rawQuery);
+		const query = parsed.keywords;
 
 		const clampedLimit = Math.min(limit, config.meili.searchMaxLimit);
 		const index = await this.getIndex<EmailDocument>('emails');
@@ -154,9 +163,14 @@ export class SearchService {
 			attributesToCrop: ['body'],
 			cropLength: config.meili.cropLength,
 			showMatchesPosition: true,
-			sort: [sort || 'timestamp:desc'],
+			...(sort ? { sort: [sort] } : {}),
 			matchingStrategy,
 		};
+
+		// Restrict search to attachment fields only
+		if (attachmentsOnly) {
+			(searchParams as any).attributesToSearchOn = ['attachments.filename', 'attachments.content'];
+		}
 
 		// Build filter string from structured filters
 		const filterParts: string[] = [];
@@ -183,6 +197,14 @@ export class SearchService {
 				const tagFilters = filters.tags.map((t) => `tags = "${t}"`);
 				filterParts.push(`(${tagFilters.join(' OR ')})`);
 			}
+			if (filters.path) {
+				filterParts.push(`path = "${filters.path}"`);
+			}
+		}
+
+		// Add boolean field filters parsed from the query string
+		if (parsed.filterExpression) {
+			filterParts.push(filterExpressionToMeiliString(parsed.filterExpression));
 		}
 
 		if (filterParts.length > 0) {
@@ -272,6 +294,7 @@ export class SearchService {
 				'attachments.content',
 				'userEmail',
 				'tags',
+				'path',
 			],
 			filterableAttributes: [
 				'from',
@@ -283,8 +306,9 @@ export class SearchService {
 				'userEmail',
 				'hasAttachments',
 				'tags',
+				'path',
 			],
-			sortableAttributes: ['timestamp'],
+			sortableAttributes: ['timestamp', 'from', 'subject'],
 		});
 	}
 }

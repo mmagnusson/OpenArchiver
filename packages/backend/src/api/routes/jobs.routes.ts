@@ -20,6 +20,11 @@ export const createJobsRouter = (authService: AuthService): Router => {
 		requirePermission('manage', 'all', 'user.requiresSuperAdminRole'),
 		jobsController.getQueueJobs
 	);
+	router.delete(
+		'/queues/:queueName/jobs',
+		requirePermission('manage', 'all', 'user.requiresSuperAdminRole'),
+		jobsController.clearQueueJobs
+	);
 
 	return router;
 };

@@ -173,9 +173,19 @@ export class IndexingService {
 				return;
 			}
 
-			logger.debug({ documentCount: validDocuments.length }, 'Sending batch to Meilisearch');
+			// Chunk documents to stay under Meilisearch's ~95 MiB payload limit.
+			// We use a conservative 80 MiB threshold to leave headroom.
+			const MAX_PAYLOAD_BYTES = 80 * 1024 * 1024;
+			const chunks = this.chunkByPayloadSize(validDocuments, MAX_PAYLOAD_BYTES);
 
-			await this.searchService.addDocuments('emails', validDocuments, 'id');
+			logger.debug(
+				{ documentCount: validDocuments.length, chunks: chunks.length },
+				'Sending batch to Meilisearch'
+			);
+
+			for (const chunk of chunks) {
+				await this.searchService.addDocuments('emails', chunk, 'id');
+			}
 
 			logger.info(
 				{
@@ -372,6 +382,7 @@ export class IndexingService {
 			ingestionSourceId: ingestionSourceId,
 			hasAttachments: attachments.length > 0,
 			tags: email.tags || [],
+			path: email.path || '',
 		};
 	}
 
@@ -407,6 +418,7 @@ export class IndexingService {
 			ingestionSourceId: email.ingestionSourceId,
 			hasAttachments: email.hasAttachments,
 			tags: (email.tags as string[]) || [],
+			path: email.path || '',
 		};
 	}
 
@@ -499,6 +511,7 @@ export class IndexingService {
 			ingestionSourceId: doc.ingestionSourceId || 'unknown',
 			hasAttachments: typeof doc.hasAttachments === 'boolean' ? doc.hasAttachments : false,
 			tags: Array.isArray(doc.tags) ? doc.tags : [],
+			path: typeof doc.path === 'string' ? doc.path : '',
 		};
 	}
 
@@ -516,5 +529,34 @@ export class IndexingService {
 			);
 			return false;
 		}
+	}
+
+	/**
+	 * Splits documents into chunks that each stay under the given byte limit
+	 * when JSON-serialized, so Meilisearch payload limits are not exceeded.
+	 */
+	private chunkByPayloadSize<T>(docs: T[], maxBytes: number): T[][] {
+		const chunks: T[][] = [];
+		let currentChunk: T[] = [];
+		let currentSize = 0;
+
+		for (const doc of docs) {
+			const docSize = Buffer.byteLength(JSON.stringify(doc), 'utf-8');
+
+			if (currentChunk.length > 0 && currentSize + docSize > maxBytes) {
+				chunks.push(currentChunk);
+				currentChunk = [];
+				currentSize = 0;
+			}
+
+			currentChunk.push(doc);
+			currentSize += docSize;
+		}
+
+		if (currentChunk.length > 0) {
+			chunks.push(currentChunk);
+		}
+
+		return chunks;
 	}
 }

@@ -13,6 +13,7 @@
 		dateFrom = $bindable(''),
 		dateTo = $bindable(''),
 		hasAttachments = $bindable(false),
+		path = $bindable(''),
 		expanded = $bindable(false),
 		onApply,
 		onClear,
@@ -22,10 +23,85 @@
 		dateFrom?: string;
 		dateTo?: string;
 		hasAttachments?: boolean;
+		path?: string;
 		expanded?: boolean;
 		onApply?: () => void;
 		onClear?: () => void;
 	} = $props();
+
+	function toISODate(d: Date): string {
+		const y = d.getFullYear();
+		const m = String(d.getMonth() + 1).padStart(2, '0');
+		const day = String(d.getDate()).padStart(2, '0');
+		return `${y}-${m}-${day}`;
+	}
+
+	const datePresets = $derived([
+		{
+			label: $t('app.search.date_preset_today'),
+			getRange: () => {
+				const now = new Date();
+				const today = toISODate(now);
+				return { from: today, to: today };
+			},
+		},
+		{
+			label: $t('app.search.date_preset_7days'),
+			getRange: () => {
+				const now = new Date();
+				const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+				return { from: toISODate(past), to: toISODate(now) };
+			},
+		},
+		{
+			label: $t('app.search.date_preset_30days'),
+			getRange: () => {
+				const now = new Date();
+				const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+				return { from: toISODate(past), to: toISODate(now) };
+			},
+		},
+		{
+			label: $t('app.search.date_preset_90days'),
+			getRange: () => {
+				const now = new Date();
+				const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+				return { from: toISODate(past), to: toISODate(now) };
+			},
+		},
+		{
+			label: $t('app.search.date_preset_this_year'),
+			getRange: () => {
+				const now = new Date();
+				const start = new Date(now.getFullYear(), 0, 1);
+				return { from: toISODate(start), to: toISODate(now) };
+			},
+		},
+		{
+			label: $t('app.search.date_preset_last_year'),
+			getRange: () => {
+				const now = new Date();
+				const start = new Date(now.getFullYear() - 1, 0, 1);
+				const end = new Date(now.getFullYear() - 1, 11, 31);
+				return { from: toISODate(start), to: toISODate(end) };
+			},
+		},
+	]);
+
+	function applyDatePreset(index: number) {
+		const range = datePresets[index].getRange();
+		dateFrom = range.from;
+		dateTo = range.to;
+	}
+
+	const activePresetIndex = $derived.by(() => {
+		if (!dateFrom || !dateTo) return -1;
+		for (let i = 0; i < datePresets.length; i++) {
+			const range = datePresets[i].getRange();
+			if (range.from === dateFrom && range.to === dateTo) return i;
+		}
+		return -1;
+	});
 
 	function handleClear() {
 		from = '';
@@ -33,11 +109,12 @@
 		dateFrom = '';
 		dateTo = '';
 		hasAttachments = false;
+		path = '';
 		onClear?.();
 	}
 
 	const hasActiveFilters = $derived(
-		!!(from || to || dateFrom || dateTo || hasAttachments)
+		!!(from || to || dateFrom || dateTo || hasAttachments || path)
 	);
 </script>
 
@@ -76,6 +153,30 @@
 						bind:value={to}
 						placeholder="recipient@example.com"
 					/>
+				</div>
+				<div class="space-y-1">
+					<Label>{$t('app.search.filter_folder')}</Label>
+					<Input
+						type="text"
+						bind:value={path}
+						placeholder="INBOX"
+					/>
+				</div>
+			<div class="col-span-full space-y-1">
+					<Label>{$t('app.search.date_presets')}</Label>
+					<div class="flex flex-wrap gap-1">
+						{#each datePresets as preset, i}
+							<Button
+								type="button"
+								variant={activePresetIndex === i ? 'default' : 'outline'}
+								size="sm"
+								class="h-7 cursor-pointer text-xs"
+								onclick={() => applyDatePreset(i)}
+							>
+								{preset.label}
+							</Button>
+						{/each}
+					</div>
 				</div>
 				<div class="space-y-1">
 					<Label>{$t('app.search.filter_date_from')}</Label>

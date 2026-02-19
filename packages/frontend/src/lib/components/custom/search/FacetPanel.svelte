@@ -82,6 +82,27 @@
 			</div>
 		{/if}
 
+		<!-- Folders -->
+		{#if facetDistribution.path && Object.keys(facetDistribution.path).length > 0}
+			<div>
+				<h4 class="mb-2 text-sm font-semibold">
+					{$t('app.search.facet_folders')}
+				</h4>
+				<div class="space-y-0.5">
+					{#each topEntries(facetDistribution.path, 15) as [folder, count]}
+						<button
+							type="button"
+							class="hover:bg-accent flex w-full cursor-pointer items-center justify-between rounded px-2 py-1 text-sm transition-colors"
+							onclick={() => onFacetClick?.('path', folder)}
+						>
+							<span class="mr-2 truncate">{folder}</span>
+							<Badge variant="secondary">{count}</Badge>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<!-- Tags -->
 		{#if facetDistribution.tags && Object.keys(facetDistribution.tags).length > 0}
 			<div>

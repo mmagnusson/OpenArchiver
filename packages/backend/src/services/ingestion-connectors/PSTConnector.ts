@@ -6,7 +6,7 @@ import type {
 	MailboxUser,
 } from '@open-archiver/types';
 import type { IEmailConnector } from '../EmailProviderFactory';
-import { PSTFile, PSTFolder, PSTMessage } from 'pst-extractor';
+import { PSTFile, PSTFolder, PSTMessage, PSTRecipient } from 'pst-extractor';
 import { simpleParser, ParsedMail, Attachment, AddressObject } from 'mailparser';
 import { logger } from '../../config/logger';
 import { getThreadId } from './helpers/utils';
@@ -309,92 +309,225 @@ export class PSTConnector implements IEmailConnector {
 		};
 	}
 
+	/**
+	 * Returns true if the address looks like an Exchange X500 DN
+	 * (e.g. /O=ORG/OU=.../CN=RECIPIENTS/CN=USER).
+	 */
+	private static isX500Address(addr: string): boolean {
+		return addr.startsWith('/O=') || addr.startsWith('/o=');
+	}
+
+	/**
+	 * Extracts the last CN value from an X500 path as a rough display name.
+	 * "/O=CITY/OU=.../CN=RECIPIENTS/CN=NLINDHAG" → "NLINDHAG"
+	 */
+	private static extractCnFromX500(addr: string): string {
+		const match = addr.match(/\/CN=([^/]+)$/i);
+		return match ? match[1] : '';
+	}
+
+	/**
+	 * Resolves an SMTP email address for the sender.
+	 * PST files from Exchange store internal X500 addresses instead of SMTP.
+	 * Falls back to senderName or extracted CN when only an X500 address is available.
+	 */
+	private resolveSenderSmtpAddress(msg: PSTMessage): string {
+		// Prefer explicit SMTP addresses
+		if (msg.senderAddrtype?.toUpperCase() === 'SMTP' && msg.senderEmailAddress) {
+			return msg.senderEmailAddress;
+		}
+		if (
+			msg.sentRepresentingAddressType?.toUpperCase() === 'SMTP' &&
+			msg.sentRepresentingEmailAddress
+		) {
+			return msg.sentRepresentingEmailAddress;
+		}
+		if (msg.returnPath) {
+			return msg.returnPath;
+		}
+
+		// If the raw address is X500, don't use it as-is
+		const rawAddr = msg.senderEmailAddress || '';
+		if (!PSTConnector.isX500Address(rawAddr)) {
+			return rawAddr;
+		}
+
+		// X500 fallback: use senderName if it looks like an email, otherwise
+		// construct a placeholder from the CN or the display name
+		if (msg.senderName && msg.senderName.includes('@')) {
+			return msg.senderName;
+		}
+
+		const cn = PSTConnector.extractCnFromX500(rawAddr);
+		const displayName = msg.senderName || cn || 'unknown';
+		logger.debug(
+			{ x500: rawAddr, senderName: msg.senderName, cn },
+			'Sender has X500 address, using display name as fallback'
+		);
+		return displayName;
+	}
+
+	/**
+	 * Resolves recipients from the PST recipient table, preferring SMTP addresses over X500.
+	 */
+	private resolveRecipients(msg: PSTMessage): {
+		toList: string[];
+		ccList: string[];
+		bccList: string[];
+	} {
+		const toList: string[] = [];
+		const ccList: string[] = [];
+		const bccList: string[] = [];
+
+		try {
+			for (let i = 0; i < msg.numberOfRecipients; i++) {
+				const recipient = msg.getRecipient(i);
+				if (!recipient) continue;
+
+				const rawEmail = recipient.smtpAddress || recipient.emailAddress || '';
+				const name = recipient.displayName || '';
+
+				// Skip X500 addresses — use display name instead
+				const email = PSTConnector.isX500Address(rawEmail) ? '' : rawEmail;
+
+				let formatted: string;
+				if (name && email) {
+					formatted = `"${name.replace(/"/g, '\\"')}" <${email}>`;
+				} else if (email) {
+					formatted = email;
+				} else if (name) {
+					// No usable email — use display name (will be parsed as name-only by mailparser)
+					formatted = name;
+				} else {
+					continue;
+				}
+
+				switch (recipient.recipientType) {
+					case 1:
+						toList.push(formatted);
+						break;
+					case 2:
+						ccList.push(formatted);
+						break;
+					case 3:
+						bccList.push(formatted);
+						break;
+					default:
+						toList.push(formatted);
+						break;
+				}
+			}
+		} catch (error) {
+			logger.warn(
+				{ error },
+				'Failed to resolve recipients from PST recipient table, falling back to display fields'
+			);
+		}
+
+		// Fall back to display fields if recipient table was empty or failed
+		if (toList.length === 0 && msg.displayTo) {
+			toList.push(msg.displayTo);
+		}
+		if (ccList.length === 0 && msg.displayCC) {
+			ccList.push(msg.displayCC);
+		}
+		if (bccList.length === 0 && msg.displayBCC) {
+			bccList.push(msg.displayBCC);
+		}
+
+		return { toList, ccList, bccList };
+	}
+
 	private async constructEml(msg: PSTMessage): Promise<string> {
-		let eml = '';
 		const boundary = '----boundary-openarchiver';
 		const altBoundary = '----boundary-openarchiver_alt';
 
-		let headers = '';
+		const senderEmail = this.resolveSenderSmtpAddress(msg);
+		const { toList, ccList, bccList } = this.resolveRecipients(msg);
 
-		if (msg.senderName || msg.senderEmailAddress) {
-			headers += `From: ${msg.senderName} <${msg.senderEmailAddress}>\n`;
+		// Build headers
+		let headers = '';
+		if (msg.senderName || senderEmail) {
+			headers += `From: "${(msg.senderName || '').replace(/"/g, '\\"')}" <${senderEmail}>\r\n`;
 		}
-		if (msg.displayTo) {
-			headers += `To: ${msg.displayTo}\n`;
+		if (toList.length > 0) {
+			headers += `To: ${toList.join(', ')}\r\n`;
 		}
-		if (msg.displayCC) {
-			headers += `Cc: ${msg.displayCC}\n`;
+		if (ccList.length > 0) {
+			headers += `Cc: ${ccList.join(', ')}\r\n`;
 		}
-		if (msg.displayBCC) {
-			headers += `Bcc: ${msg.displayBCC}\n`;
+		if (bccList.length > 0) {
+			headers += `Bcc: ${bccList.join(', ')}\r\n`;
 		}
 		if (msg.subject) {
-			headers += `Subject: ${msg.subject}\n`;
+			headers += `Subject: ${msg.subject}\r\n`;
 		}
 		if (msg.clientSubmitTime) {
-			headers += `Date: ${new Date(msg.clientSubmitTime).toUTCString()}\n`;
+			headers += `Date: ${new Date(msg.clientSubmitTime).toUTCString()}\r\n`;
 		}
 		if (msg.internetMessageId) {
-			headers += `Message-ID: <${msg.internetMessageId}>\n`;
+			headers += `Message-ID: <${msg.internetMessageId}>\r\n`;
 		}
 		if (msg.inReplyToId) {
-			headers += `In-Reply-To: ${msg.inReplyToId}`;
+			headers += `In-Reply-To: ${msg.inReplyToId}\r\n`;
 		}
 		if (msg.conversationId) {
-			headers += `Conversation-Id: ${msg.conversationId}`;
+			headers += `Conversation-Id: ${msg.conversationId}\r\n`;
 		}
-		headers += 'MIME-Version: 1.0\n';
+		headers += 'MIME-Version: 1.0\r\n';
 
-		//add new headers
-		if (!/Content-Type:/i.test(headers)) {
-			if (msg.hasAttachments) {
-				headers += `Content-Type: multipart/mixed; boundary="${boundary}"\n`;
-				headers += `Content-Type: multipart/alternative; boundary="${altBoundary}"\n\n`;
-				eml += headers;
-				eml += `--${boundary}\n\n`;
-			} else {
-				eml += headers;
-				eml += `Content-Type: multipart/alternative; boundary="${altBoundary}"\n\n`;
-			}
-		}
-		// Body
 		const hasBody = !!msg.body;
 		const hasHtml = !!msg.bodyHTML;
 
+		// Build the alternative part (body text + html)
+		let altPart = '';
 		if (hasBody) {
-			eml += `--${altBoundary}\n`;
-			eml += 'Content-Type: text/plain; charset="utf-8"\n\n';
-			eml += `${msg.body}\n\n`;
+			altPart += `--${altBoundary}\r\n`;
+			altPart += 'Content-Type: text/plain; charset="utf-8"\r\n\r\n';
+			altPart += `${msg.body}\r\n\r\n`;
 		}
-
 		if (hasHtml) {
-			eml += `--${altBoundary}\n`;
-			eml += 'Content-Type: text/html; charset="utf-8"\n\n';
-			eml += `${msg.bodyHTML}\n\n`;
+			altPart += `--${altBoundary}\r\n`;
+			altPart += 'Content-Type: text/html; charset="utf-8"\r\n\r\n';
+			altPart += `${msg.bodyHTML}\r\n\r\n`;
 		}
-
 		if (hasBody || hasHtml) {
-			eml += `--${altBoundary}--\n`;
+			altPart += `--${altBoundary}--\r\n`;
 		}
 
 		if (msg.hasAttachments) {
+			// multipart/mixed wrapping multipart/alternative + attachments
+			headers += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
+			let eml = headers + '\r\n';
+
+			// First part: the body as multipart/alternative
+			eml += `--${boundary}\r\n`;
+			eml += `Content-Type: multipart/alternative; boundary="${altBoundary}"\r\n\r\n`;
+			eml += altPart;
+
+			// Attachment parts
 			for (let i = 0; i < msg.numberOfAttachments; i++) {
 				const attachment = msg.getAttachment(i);
 				const attachmentStream = attachment.fileInputStream;
 				if (attachmentStream) {
 					const attachmentBuffer = Buffer.alloc(attachment.filesize);
 					attachmentStream.readCompletely(attachmentBuffer);
-					eml += `\n--${boundary}\n`;
-					eml += `Content-Type: ${attachment.mimeTag}; name="${attachment.longFilename}"\n`;
-					eml += `Content-Disposition: attachment; filename="${attachment.longFilename}"\n`;
-					eml += 'Content-Transfer-Encoding: base64\n\n';
-					eml += `${attachmentBuffer.toString('base64')}\n`;
+					eml += `--${boundary}\r\n`;
+					eml += `Content-Type: ${attachment.mimeTag}; name="${attachment.longFilename}"\r\n`;
+					eml += `Content-Disposition: attachment; filename="${attachment.longFilename}"\r\n`;
+					eml += 'Content-Transfer-Encoding: base64\r\n\r\n';
+					eml += `${attachmentBuffer.toString('base64')}\r\n`;
 				}
 			}
-			eml += `\n--${boundary}--`;
+			eml += `--${boundary}--\r\n`;
+			return eml;
+		} else {
+			// No attachments: simple multipart/alternative
+			headers += `Content-Type: multipart/alternative; boundary="${altBoundary}"\r\n`;
+			let eml = headers + '\r\n';
+			eml += altPart;
+			return eml;
 		}
-
-		return eml;
 	}
 
 	public getUpdatedSyncState(): SyncState {

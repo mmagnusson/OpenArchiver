@@ -22,6 +22,8 @@ export const load: PageServerLoad = async (event) => {
 	const page = parseInt(event.url.searchParams.get('page') || '1');
 	const matchingStrategy = (event.url.searchParams.get('matchingStrategy') ||
 		'last') as MatchingStrategy;
+	const sortBy = event.url.searchParams.get('sortBy') || undefined;
+	const attachmentsOnly = event.url.searchParams.get('attachmentsOnly') === 'true';
 
 	// Advanced filter params
 	const from = event.url.searchParams.get('from') || undefined;
@@ -31,6 +33,7 @@ export const load: PageServerLoad = async (event) => {
 	const hasAttachmentsParam = event.url.searchParams.get('hasAttachments');
 	const ingestionSourceId =
 		event.url.searchParams.get('ingestionSourceId') || undefined;
+	const path = event.url.searchParams.get('path') || undefined;
 
 	const hasAdvancedFilters = !!(
 		from ||
@@ -38,11 +41,12 @@ export const load: PageServerLoad = async (event) => {
 		dateFrom ||
 		dateTo ||
 		hasAttachmentsParam ||
-		ingestionSourceId
+		ingestionSourceId ||
+		path
 	);
 
 	// If no search criteria, return initial state with saved searches
-	if (!keywords && !hasAdvancedFilters) {
+	if (!keywords && !hasAdvancedFilters && !attachmentsOnly) {
 		const savedSearches = await loadSavedSearches(event);
 		return {
 			searchResult: null,
@@ -51,6 +55,8 @@ export const load: PageServerLoad = async (event) => {
 			matchingStrategy: 'last' as MatchingStrategy,
 			filters: {},
 			savedSearches,
+			sortBy: undefined,
+			attachmentsOnly: false,
 		};
 	}
 
@@ -64,15 +70,18 @@ export const load: PageServerLoad = async (event) => {
 		filters.hasAttachments = hasAttachmentsParam === 'true';
 	}
 	if (ingestionSourceId) filters.ingestionSourceId = ingestionSourceId;
+	if (path) filters.path = path;
 
 	const body: AdvancedSearchQuery = {
 		query: keywords,
 		page,
 		limit: 10,
 		matchingStrategy,
-		facets: ['from', 'hasAttachments', 'tags'],
+		facets: ['from', 'hasAttachments', 'tags', 'path'],
 		filters:
 			Object.keys(filters).length > 0 ? filters : undefined,
+		...(sortBy ? { sort: sortBy } : {}),
+		...(attachmentsOnly ? { attachmentsOnly: true } : {}),
 	};
 
 	try {
@@ -91,6 +100,8 @@ export const load: PageServerLoad = async (event) => {
 				matchingStrategy,
 				filters,
 				savedSearches,
+				sortBy,
+				attachmentsOnly,
 				error: error.message,
 			};
 		}
@@ -104,6 +115,8 @@ export const load: PageServerLoad = async (event) => {
 			matchingStrategy,
 			filters,
 			savedSearches,
+			sortBy,
+			attachmentsOnly,
 		};
 	} catch (error) {
 		const savedSearches = await loadSavedSearches(event);
@@ -114,6 +127,8 @@ export const load: PageServerLoad = async (event) => {
 			matchingStrategy,
 			filters,
 			savedSearches,
+			sortBy,
+			attachmentsOnly,
 			error: error instanceof Error ? error.message : 'Unknown error',
 		};
 	}

@@ -30,7 +30,7 @@ async function backfill() {
 		.select({ count: sql<number>`count(*)::int` })
 		.from(archivedEmails);
 
-	logger.info({ totalEmails: count }, 'Starting Meilisearch backfill for hasAttachments and tags');
+	logger.info({ totalEmails: count }, 'Starting Meilisearch backfill for hasAttachments, tags, and path');
 
 	let offset = 0;
 	let processed = 0;
@@ -41,6 +41,7 @@ async function backfill() {
 				id: archivedEmails.id,
 				hasAttachments: archivedEmails.hasAttachments,
 				tags: archivedEmails.tags,
+				path: archivedEmails.path,
 			})
 			.from(archivedEmails)
 			.limit(BATCH_SIZE)
@@ -52,6 +53,7 @@ async function backfill() {
 			id: row.id,
 			hasAttachments: row.hasAttachments,
 			tags: (row.tags as string[]) || [],
+			path: row.path || '',
 		}));
 
 		await searchService.addDocuments('emails', partialDocs, 'id');
