@@ -26,11 +26,12 @@ async function backfill() {
 	await searchService.configureEmailIndex();
 
 	// Count total emails
-	const [{ count }] = await db
-		.select({ count: sql<number>`count(*)::int` })
-		.from(archivedEmails);
+	const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(archivedEmails);
 
-	logger.info({ totalEmails: count }, 'Starting Meilisearch backfill for hasAttachments, tags, and path');
+	logger.info(
+		{ totalEmails: count },
+		'Starting Meilisearch backfill for hasAttachments, tags, and path'
+	);
 
 	let offset = 0;
 	let processed = 0;
@@ -68,6 +69,9 @@ async function backfill() {
 }
 
 backfill().catch((error) => {
-	logger.error({ error: error instanceof Error ? error.message : String(error) }, 'Backfill failed');
+	logger.error(
+		{ error: error instanceof Error ? error.message : String(error) },
+		'Backfill failed'
+	);
 	process.exit(1);
 });

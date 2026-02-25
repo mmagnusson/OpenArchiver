@@ -32,11 +32,7 @@ export const createSearchRouter = (
 		savedSearchController.findById
 	);
 	router.post('/saved', requirePermission('search', 'archive'), savedSearchController.create);
-	router.put(
-		'/saved/:id',
-		requirePermission('search', 'archive'),
-		savedSearchController.update
-	);
+	router.put('/saved/:id', requirePermission('search', 'archive'), savedSearchController.update);
 	router.delete(
 		'/saved/:id',
 		requirePermission('search', 'archive'),

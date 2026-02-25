@@ -216,10 +216,7 @@ describe('filterExpressionToMeiliString', () => {
 			left: { type: 'filter', filter: { field: 'from', operator: 'eq', value: 'john' } },
 			right: { type: 'filter', filter: { field: 'from', operator: 'eq', value: 'jane' } },
 		};
-		assert.equal(
-			filterExpressionToMeiliString(expr),
-			'(from = "john" OR from = "jane")'
-		);
+		assert.equal(filterExpressionToMeiliString(expr), '(from = "john" OR from = "jane")');
 	});
 
 	it('converts NOT expression', () => {
@@ -253,9 +250,7 @@ describe('filtersToMeiliString', () => {
 	});
 
 	it('converts single filter', () => {
-		const result = filtersToMeiliString([
-			{ field: 'from', operator: 'eq', value: 'john' },
-		]);
+		const result = filtersToMeiliString([{ field: 'from', operator: 'eq', value: 'john' }]);
 		assert.equal(result, 'from = "john"');
 	});
 
@@ -285,10 +280,7 @@ describe('end-to-end: parse + convert', () => {
 	it('(from:john OR to:john) AND has:attachment → correct Meilisearch filter', () => {
 		const parsed = parseSearchQuery('(from:john OR to:john) AND has:attachment');
 		const meiliFilter = filterExpressionToMeiliString(parsed.filterExpression!);
-		assert.equal(
-			meiliFilter,
-			'(from = "john" OR to = "john") AND hasAttachments = true'
-		);
+		assert.equal(meiliFilter, '(from = "john" OR to = "john") AND hasAttachments = true');
 	});
 
 	it('before:2024-01-01 after:2023-01-01 → range filters in expression', () => {

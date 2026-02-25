@@ -13,10 +13,7 @@
 		onFacetClick?: (field: string, value: string) => void;
 	} = $props();
 
-	function topEntries(
-		dist: Record<string, number> | undefined,
-		limit = 10
-	): [string, number][] {
+	function topEntries(dist: Record<string, number> | undefined, limit = 10): [string, number][] {
 		if (!dist) return [];
 		return Object.entries(dist)
 			.sort(([, a], [, b]) => b - a)
@@ -111,11 +108,8 @@
 				</h4>
 				<div class="flex flex-wrap gap-1">
 					{#each topEntries(facetDistribution.tags, 20) as [tag, count]}
-						<button
-							type="button"
-							onclick={() => onFacetClick?.('tags', tag)}
-						>
-							<Badge variant="outline" class="cursor-pointer hover:bg-accent">
+						<button type="button" onclick={() => onFacetClick?.('tags', tag)}>
+							<Badge variant="outline" class="hover:bg-accent cursor-pointer">
 								{tag} ({count})
 							</Badge>
 						</button>

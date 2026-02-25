@@ -65,7 +65,14 @@ export class SearchService {
 		userId: string,
 		actorIp: string
 	): Promise<SearchResult> {
-		const { query, filters, filterString, page = 1, limit = 10, matchingStrategy = 'last' } = dto;
+		const {
+			query,
+			filters,
+			filterString,
+			page = 1,
+			limit = 10,
+			matchingStrategy = 'last',
+		} = dto;
 		const index = await this.getIndex<EmailDocument>('emails');
 
 		const searchParams: SearchParams = {
@@ -169,7 +176,10 @@ export class SearchService {
 
 		// Restrict search to attachment fields only
 		if (attachmentsOnly) {
-			(searchParams as any).attributesToSearchOn = ['attachments.filename', 'attachments.content'];
+			(searchParams as any).attributesToSearchOn = [
+				'attachments.filename',
+				'attachments.content',
+			];
 		}
 
 		// Build filter string from structured filters

@@ -31,8 +31,7 @@ export const load: PageServerLoad = async (event) => {
 	const dateFrom = event.url.searchParams.get('dateFrom') || undefined;
 	const dateTo = event.url.searchParams.get('dateTo') || undefined;
 	const hasAttachmentsParam = event.url.searchParams.get('hasAttachments');
-	const ingestionSourceId =
-		event.url.searchParams.get('ingestionSourceId') || undefined;
+	const ingestionSourceId = event.url.searchParams.get('ingestionSourceId') || undefined;
 	const path = event.url.searchParams.get('path') || undefined;
 
 	const hasAdvancedFilters = !!(
@@ -78,8 +77,7 @@ export const load: PageServerLoad = async (event) => {
 		limit: 10,
 		matchingStrategy,
 		facets: ['from', 'hasAttachments', 'tags', 'path'],
-		filters:
-			Object.keys(filters).length > 0 ? filters : undefined,
+		filters: Object.keys(filters).length > 0 ? filters : undefined,
 		...(sortBy ? { sort: sortBy } : {}),
 		...(attachmentsOnly ? { attachmentsOnly: true } : {}),
 	};

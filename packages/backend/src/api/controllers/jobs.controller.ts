@@ -50,7 +50,13 @@ export class JobsController {
 				return;
 			}
 
-			const validStatuses: JobStatus[] = ['completed', 'failed', 'delayed', 'waiting', 'paused'];
+			const validStatuses: JobStatus[] = [
+				'completed',
+				'failed',
+				'delayed',
+				'waiting',
+				'paused',
+			];
 			if (!validStatuses.includes(status as JobStatus)) {
 				res.status(400).json({
 					message: `Invalid status "${status}". Must be one of: ${validStatuses.join(', ')}`,

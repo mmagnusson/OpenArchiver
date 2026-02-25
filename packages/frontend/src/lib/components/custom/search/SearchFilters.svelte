@@ -136,33 +136,21 @@
 	</button>
 
 	{#if expanded}
-		<div class="rounded-lg border p-4 space-y-4">
+		<div class="space-y-4 rounded-lg border p-4">
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 				<div class="space-y-1">
 					<Label>{$t('app.search.filter_sender')}</Label>
-					<Input
-						type="text"
-						bind:value={from}
-						placeholder="sender@example.com"
-					/>
+					<Input type="text" bind:value={from} placeholder="sender@example.com" />
 				</div>
 				<div class="space-y-1">
 					<Label>{$t('app.search.filter_recipient')}</Label>
-					<Input
-						type="text"
-						bind:value={to}
-						placeholder="recipient@example.com"
-					/>
+					<Input type="text" bind:value={to} placeholder="recipient@example.com" />
 				</div>
 				<div class="space-y-1">
 					<Label>{$t('app.search.filter_folder')}</Label>
-					<Input
-						type="text"
-						bind:value={path}
-						placeholder="INBOX"
-					/>
+					<Input type="text" bind:value={path} placeholder="INBOX" />
 				</div>
-			<div class="col-span-full space-y-1">
+				<div class="col-span-full space-y-1">
 					<Label>{$t('app.search.date_presets')}</Label>
 					<div class="flex flex-wrap gap-1">
 						{#each datePresets as preset, i}
@@ -188,7 +176,10 @@
 				</div>
 				<div class="flex items-center gap-2 pt-6">
 					<Checkbox bind:checked={hasAttachments} />
-					<Label class="cursor-pointer" onclick={() => (hasAttachments = !hasAttachments)}>
+					<Label
+						class="cursor-pointer"
+						onclick={() => (hasAttachments = !hasAttachments)}
+					>
 						{$t('app.search.filter_has_attachments')}
 					</Label>
 				</div>

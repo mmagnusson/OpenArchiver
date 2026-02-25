@@ -60,7 +60,9 @@
 					>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm">{truncate(entry.summary, 40)}</p>
-							<p class="text-muted-foreground text-xs">{formatRelativeTime(entry.timestamp)}</p>
+							<p class="text-muted-foreground text-xs">
+								{formatRelativeTime(entry.timestamp)}
+							</p>
 						</div>
 						<span
 							role="button"

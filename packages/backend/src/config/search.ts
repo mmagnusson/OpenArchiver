@@ -18,7 +18,5 @@ export const meiliConfig = {
 	facetMaxValuesPerFacet: process.env.MEILI_FACET_MAX_VALUES
 		? parseInt(process.env.MEILI_FACET_MAX_VALUES)
 		: 100,
-	cropLength: process.env.MEILI_CROP_LENGTH
-		? parseInt(process.env.MEILI_CROP_LENGTH)
-		: 200,
+	cropLength: process.env.MEILI_CROP_LENGTH ? parseInt(process.env.MEILI_CROP_LENGTH) : 200,
 };

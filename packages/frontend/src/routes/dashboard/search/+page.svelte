@@ -83,8 +83,7 @@
 	);
 
 	const sortTriggerContent = $derived(
-		sortOptions.find((s) => s.value === sortBy)?.label ??
-			$t('app.search.sort_relevance')
+		sortOptions.find((s) => s.value === sortBy)?.label ?? $t('app.search.sort_relevance')
 	);
 
 	let isMounted = $state(false);
@@ -163,7 +162,16 @@
 		if (e) e.preventDefault();
 		const params = buildSearchParams();
 		try {
-			if (keywords || filterFrom || filterTo || filterDateFrom || filterDateTo || filterHasAttachments || filterPath || attachmentsOnly) {
+			if (
+				keywords ||
+				filterFrom ||
+				filterTo ||
+				filterDateFrom ||
+				filterDateTo ||
+				filterHasAttachments ||
+				filterPath ||
+				attachmentsOnly
+			) {
 				addToSearchHistory(currentQuery);
 			}
 		} catch (err) {
@@ -313,7 +321,16 @@
 			<SearchHistory onLoad={handleLoadHistory} />
 			<SavedSearches
 				bind:savedSearches
-				currentQuery={keywords || filterFrom || filterTo || filterDateFrom || filterDateTo || filterHasAttachments || filterPath || attachmentsOnly ? currentQuery : undefined}
+				currentQuery={keywords ||
+				filterFrom ||
+				filterTo ||
+				filterDateFrom ||
+				filterDateTo ||
+				filterHasAttachments ||
+				filterPath ||
+				attachmentsOnly
+					? currentQuery
+					: undefined}
 				onLoad={handleLoadSavedSearch}
 			/>
 		</div>
@@ -370,7 +387,10 @@
 
 			<div class="flex items-center gap-1.5">
 				<Checkbox bind:checked={attachmentsOnly} />
-				<Label class="cursor-pointer text-sm" onclick={() => (attachmentsOnly = !attachmentsOnly)}>
+				<Label
+					class="cursor-pointer text-sm"
+					onclick={() => (attachmentsOnly = !attachmentsOnly)}
+				>
 					{$t('app.search.attachments_only')}
 				</Label>
 			</div>
@@ -421,15 +441,25 @@
 						{@const _formatted = hit._formatted || {}}
 						{@const matchCounts = getMatchCounts(hit)}
 						{@const bodySnippets = getHighlightedSnippets(_formatted.body)}
-						{@const attachmentSnippets = (_formatted.attachments || []).flatMap((att, i) =>
-							att && att.content
-								? getHighlightedSnippets(att.content).map((s) => ({ snippet: s, filename: att.filename }))
-								: []
+						{@const attachmentSnippets = (_formatted.attachments || []).flatMap(
+							(att, i) =>
+								att && att.content
+									? getHighlightedSnippets(att.content).map((s) => ({
+											snippet: s,
+											filename: att.filename,
+										}))
+									: []
 						)}
 						{@const isExpanded = expandedSnippets.has(hit.id)}
-						{@const visibleBodySnippets = isExpanded ? bodySnippets : bodySnippets.slice(0, SNIPPET_LIMIT)}
-						{@const visibleAttachmentSnippets = isExpanded ? attachmentSnippets : attachmentSnippets.slice(0, SNIPPET_LIMIT)}
-						{@const hasMoreSnippets = bodySnippets.length > SNIPPET_LIMIT || attachmentSnippets.length > SNIPPET_LIMIT}
+						{@const visibleBodySnippets = isExpanded
+							? bodySnippets
+							: bodySnippets.slice(0, SNIPPET_LIMIT)}
+						{@const visibleAttachmentSnippets = isExpanded
+							? attachmentSnippets
+							: attachmentSnippets.slice(0, SNIPPET_LIMIT)}
+						{@const hasMoreSnippets =
+							bodySnippets.length > SNIPPET_LIMIT ||
+							attachmentSnippets.length > SNIPPET_LIMIT}
 						<a href="/dashboard/archived-emails/{hit.id}" class="block">
 							<Card>
 								<CardHeader>
@@ -437,7 +467,9 @@
 										{#if !isMounted}
 											<Skeleton class="h-6 w-3/4" />
 										{:else}
-											<div use:shadowRender={_formatted.subject || hit.subject}></div>
+											<div
+												use:shadowRender={_formatted.subject || hit.subject}
+											></div>
 										{/if}
 									</CardTitle>
 									<CardDescription
@@ -446,7 +478,8 @@
 										<span class="pr-2">
 											<span>{$t('app.search.from')}:</span>
 											{#if !isMounted}
-												<span class="bg-accent h-4 w-40 animate-pulse rounded-md"
+												<span
+													class="bg-accent h-4 w-40 animate-pulse rounded-md"
 												></span>
 											{:else}
 												<span
@@ -458,7 +491,8 @@
 										<span class="pr-2">
 											<span>{$t('app.search.to')}:</span>
 											{#if !isMounted}
-												<span class="bg-accent h-4 w-40 animate-pulse rounded-md"
+												<span
+													class="bg-accent h-4 w-40 animate-pulse rounded-md"
 												></span>
 											{:else}
 												<span
@@ -470,7 +504,8 @@
 										</span>
 										<span>
 											{#if !isMounted}
-												<span class="bg-accent h-4 w-40 animate-pulse rounded-md"
+												<span
+													class="bg-accent h-4 w-40 animate-pulse rounded-md"
 												></span>
 											{:else}
 												<span class="inline-block">
@@ -486,16 +521,28 @@
 										<p class="text-muted-foreground text-xs">
 											{#if matchCounts.body > 0}
 												{matchCounts.body === 1
-													? $t('app.search.match_count', { count: matchCounts.body, field: 'body' } as any)
-													: $t('app.search.match_count_plural', { count: matchCounts.body, field: 'body' } as any)}
+													? $t('app.search.match_count', {
+															count: matchCounts.body,
+															field: 'body',
+														} as any)
+													: $t('app.search.match_count_plural', {
+															count: matchCounts.body,
+															field: 'body',
+														} as any)}
 											{/if}
 											{#if matchCounts.body > 0 && matchCounts.attachments > 0}
 												{', '}
 											{/if}
 											{#if matchCounts.attachments > 0}
 												{matchCounts.attachments === 1
-													? $t('app.search.match_count', { count: matchCounts.attachments, field: 'attachments' } as any)
-													: $t('app.search.match_count_plural', { count: matchCounts.attachments, field: 'attachments' } as any)}
+													? $t('app.search.match_count', {
+															count: matchCounts.attachments,
+															field: 'attachments',
+														} as any)
+													: $t('app.search.match_count_plural', {
+															count: matchCounts.attachments,
+															field: 'attachments',
+														} as any)}
 											{/if}
 										</p>
 									{/if}
@@ -545,9 +592,15 @@
 										<button
 											type="button"
 											class="text-primary hover:text-primary/80 cursor-pointer text-xs font-medium"
-											onclick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSnippetExpand(hit.id); }}
+											onclick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												toggleSnippetExpand(hit.id);
+											}}
 										>
-											{isExpanded ? $t('app.search.show_less_snippets') : $t('app.search.show_more_snippets')}
+											{isExpanded
+												? $t('app.search.show_less_snippets')
+												: $t('app.search.show_more_snippets')}
 										</button>
 									{/if}
 								</CardContent>
@@ -558,7 +611,11 @@
 
 				{#if searchResult.total > searchResult.limit}
 					<div class="mt-8">
-						<Pagination.Root count={searchResult.total} perPage={searchResult.limit} {page}>
+						<Pagination.Root
+							count={searchResult.total}
+							perPage={searchResult.limit}
+							{page}
+						>
 							{#snippet children({ pages, currentPage })}
 								<Pagination.Content>
 									<Pagination.Item>
@@ -567,7 +624,9 @@
 										>
 											<Pagination.PrevButton>
 												<ChevronLeft class="h-4 w-4" />
-												<span class="hidden sm:block">{$t('app.search.prev')}</span>
+												<span class="hidden sm:block"
+													>{$t('app.search.prev')}</span
+												>
 											</Pagination.PrevButton>
 										</a>
 									</Pagination.Item>
@@ -596,7 +655,9 @@
 											href={`/dashboard/search?${buildPaginationParams(currentPage + 1)}`}
 										>
 											<Pagination.NextButton>
-												<span class="hidden sm:block">{$t('app.search.next')}</span>
+												<span class="hidden sm:block"
+													>{$t('app.search.next')}</span
+												>
 												<ChevronRight class="h-4 w-4" />
 											</Pagination.NextButton>
 										</a>
