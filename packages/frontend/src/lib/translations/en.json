@@ -135,7 +135,18 @@
 			"show_more_snippets": "Show more",
 			"show_less_snippets": "Show less",
 			"facet_folders": "Folders",
-			"filter_folder": "Folder"
+			"filter_folder": "Folder",
+			"no_results": "No results found",
+			"no_results_suggestion": "Try adjusting your search terms or filters to find what you're looking for.",
+			"active_filters": "Active filters",
+			"clear_filter": "Clear",
+			"select_folder": "Select a folder",
+			"custom_path": "Custom",
+			"suggestions_live": "Results",
+			"suggestions_recent": "Recent",
+			"suggestions_saved": "Saved",
+			"suggestions_loading": "Loading...",
+			"press_enter_to_search": "Press Enter to search"
 		},
 		"roles": {
 			"title": "Role Management",

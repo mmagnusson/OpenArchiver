@@ -72,6 +72,7 @@ export interface EmailDocument {
 	id: string; // The unique ID of the email
 	userEmail: string;
 	from: string;
+	senderName: string;
 	to: string[];
 	cc: string[];
 	bcc: string[];
@@ -86,4 +87,5 @@ export interface EmailDocument {
 	hasAttachments: boolean;
 	tags: string[];
 	path: string;
+	sizeBytes: number;
 }

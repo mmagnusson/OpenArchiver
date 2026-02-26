@@ -372,6 +372,7 @@ export class IndexingService {
 			id: archivedEmailId,
 			userEmail: userEmail,
 			from: email.from[0]?.address,
+			senderName: email.from[0]?.name || '',
 			to: email.to.map((i: EmailAddress) => i.address) || [],
 			cc: email.cc?.map((i: EmailAddress) => i.address) || [],
 			bcc: email.bcc?.map((i: EmailAddress) => i.address) || [],
@@ -383,6 +384,7 @@ export class IndexingService {
 			hasAttachments: attachments.length > 0,
 			tags: email.tags || [],
 			path: email.path || '',
+			sizeBytes: 0,
 		};
 	}
 
@@ -408,6 +410,7 @@ export class IndexingService {
 			id: email.id,
 			userEmail: userEmail,
 			from: email.senderEmail,
+			senderName: email.senderName || '',
 			to: recipients.to?.map((r) => r.address) || [],
 			cc: recipients.cc?.map((r) => r.address) || [],
 			bcc: recipients.bcc?.map((r) => r.address) || [],
@@ -419,6 +422,7 @@ export class IndexingService {
 			hasAttachments: email.hasAttachments,
 			tags: (email.tags as string[]) || [],
 			path: email.path || '',
+			sizeBytes: email.sizeBytes || 0,
 		};
 	}
 
@@ -501,6 +505,7 @@ export class IndexingService {
 			id: doc.id || 'missing-id',
 			userEmail: doc.userEmail || 'unknown',
 			from: doc.from || '',
+			senderName: doc.senderName || '',
 			to: Array.isArray(doc.to) ? doc.to : [],
 			cc: Array.isArray(doc.cc) ? doc.cc : [],
 			bcc: Array.isArray(doc.bcc) ? doc.bcc : [],
@@ -512,6 +517,7 @@ export class IndexingService {
 			hasAttachments: typeof doc.hasAttachments === 'boolean' ? doc.hasAttachments : false,
 			tags: Array.isArray(doc.tags) ? doc.tags : [],
 			path: typeof doc.path === 'string' ? doc.path : '',
+			sizeBytes: typeof doc.sizeBytes === 'number' ? doc.sizeBytes : 0,
 		};
 	}
 

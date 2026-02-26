@@ -3,6 +3,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Checkbox } from '$lib/components/ui/checkbox';
+	import * as Select from '$lib/components/ui/select';
 	import { t } from '$lib/translations';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -15,6 +16,7 @@
 		hasAttachments = $bindable(false),
 		path = $bindable(''),
 		expanded = $bindable(false),
+		availablePaths = [],
 		onApply,
 		onClear,
 	}: {
@@ -25,9 +27,12 @@
 		hasAttachments?: boolean;
 		path?: string;
 		expanded?: boolean;
+		availablePaths?: string[];
 		onApply?: () => void;
 		onClear?: () => void;
 	} = $props();
+
+	let useCustomPath = $state(false);
 
 	function toISODate(d: Date): string {
 		const y = d.getFullYear();
@@ -148,7 +153,54 @@
 				</div>
 				<div class="space-y-1">
 					<Label>{$t('app.search.filter_folder')}</Label>
-					<Input type="text" bind:value={path} placeholder="INBOX" />
+					{#if availablePaths.length > 0 && !useCustomPath}
+						<div class="flex gap-1">
+							<Select.Root type="single" bind:value={path}>
+								<Select.Trigger class="flex-1 cursor-pointer">
+									{path || $t('app.search.select_folder')}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="" label={$t('app.search.select_folder')}>
+										{$t('app.search.select_folder')}
+									</Select.Item>
+									{#each availablePaths as folderPath}
+										<Select.Item value={folderPath} label={folderPath}>
+											{folderPath}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="cursor-pointer text-xs"
+								onclick={() => (useCustomPath = true)}
+							>
+								{$t('app.search.custom_path')}
+							</Button>
+						</div>
+					{:else}
+						<div class="flex gap-1">
+							<Input
+								type="text"
+								bind:value={path}
+								placeholder="INBOX"
+								class="flex-1"
+							/>
+							{#if availablePaths.length > 0}
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="cursor-pointer text-xs"
+									onclick={() => (useCustomPath = false)}
+								>
+									{$t('app.search.select_folder')}
+								</Button>
+							{/if}
+						</div>
+					{/if}
 				</div>
 				<div class="col-span-full space-y-1">
 					<Label>{$t('app.search.date_presets')}</Label>

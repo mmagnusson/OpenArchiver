@@ -17,6 +17,9 @@ export const createSearchRouter = (
 	// Existing GET endpoint (backward compatible, now with query parser)
 	router.get('/', requirePermission('search', 'archive'), searchController.search);
 
+	// Lightweight suggest endpoint for search-as-you-type
+	router.get('/suggest', requirePermission('search', 'archive'), searchController.suggest);
+
 	// Advanced search via POST with structured JSON body
 	router.post(
 		'/advanced',

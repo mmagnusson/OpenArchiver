@@ -210,6 +210,12 @@ export class SearchService {
 			if (filters.path) {
 				filterParts.push(`path = "${filters.path}"`);
 			}
+			if (filters.sizeMin !== undefined && filters.sizeMin > 0) {
+				filterParts.push(`sizeBytes >= ${filters.sizeMin}`);
+			}
+			if (filters.sizeMax !== undefined && filters.sizeMax > 0) {
+				filterParts.push(`sizeBytes <= ${filters.sizeMax}`);
+			}
 		}
 
 		// Add boolean field filters parsed from the query string
@@ -297,6 +303,7 @@ export class SearchService {
 				'subject',
 				'body',
 				'from',
+				'senderName',
 				'to',
 				'cc',
 				'bcc',
@@ -308,17 +315,53 @@ export class SearchService {
 			],
 			filterableAttributes: [
 				'from',
+				'senderName',
 				'to',
 				'cc',
 				'bcc',
 				'timestamp',
+				'sizeBytes',
 				'ingestionSourceId',
 				'userEmail',
 				'hasAttachments',
 				'tags',
 				'path',
 			],
-			sortableAttributes: ['timestamp', 'from', 'subject'],
+			sortableAttributes: ['timestamp', 'from', 'subject', 'sizeBytes'],
 		});
+	}
+
+	public async suggestEmails(
+		query: string,
+		userId: string
+	): Promise<{ hits: any[]; processingTimeMs: number }> {
+		const index = await this.getIndex<EmailDocument>('emails');
+
+		const searchParams: SearchParams = {
+			limit: 5,
+			attributesToRetrieve: [
+				'id',
+				'subject',
+				'from',
+				'senderName',
+				'timestamp',
+				'hasAttachments',
+			],
+			attributesToHighlight: ['subject'],
+			showMatchesPosition: false,
+		};
+
+		// Inject CASL access-control filter
+		const { searchFilter } = await FilterBuilder.create(userId, 'archive', 'read');
+		if (searchFilter) {
+			searchParams.filter = searchFilter;
+		}
+
+		const searchResults = await index.search(query, searchParams);
+
+		return {
+			hits: searchResults.hits,
+			processingTimeMs: searchResults.processingTimeMs,
+		};
 	}
 }

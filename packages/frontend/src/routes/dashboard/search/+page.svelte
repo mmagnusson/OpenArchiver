@@ -1,27 +1,14 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Select from '$lib/components/ui/select';
-	import {
-		Card,
-		CardContent,
-		CardHeader,
-		CardTitle,
-		CardDescription,
-	} from '$lib/components/ui/card';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import type {
-		MatchingStrategy,
-		AdvancedSearchQuery,
-		SavedSearch,
-		SearchHit,
-	} from '@open-archiver/types';
+	import type { MatchingStrategy, AdvancedSearchQuery, SavedSearch } from '@open-archiver/types';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { t } from '$lib/translations';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
@@ -31,6 +18,9 @@
 	import FacetPanel from '$lib/components/custom/search/FacetPanel.svelte';
 	import SavedSearches from '$lib/components/custom/search/SavedSearches.svelte';
 	import SearchHistory from '$lib/components/custom/search/SearchHistory.svelte';
+	import SearchResultCard from '$lib/components/custom/search/SearchResultCard.svelte';
+	import ActiveFilterChips from '$lib/components/custom/search/ActiveFilterChips.svelte';
+	import SearchSuggestions from '$lib/components/custom/search/SearchSuggestions.svelte';
 	import { addToSearchHistory, type SearchHistoryEntry } from '$lib/stores/searchHistory.store';
 
 	let { data }: { data: PageData } = $props();
@@ -57,9 +47,6 @@
 	let filterHasAttachments = $state((data as any).filters?.hasAttachments || false);
 	let filterPath = $state((data as any).filters?.path || '');
 	let filtersExpanded = $state(false);
-
-	// Snippet expand state
-	let expandedSnippets = $state(new Set<string>());
 
 	const strategies = [
 		{ value: 'last', label: $t('app.search.strategy_fuzzy') },
@@ -106,25 +93,6 @@
 		...(sortBy ? { sort: sortBy } : {}),
 		...(attachmentsOnly ? { attachmentsOnly: true } : {}),
 	});
-
-	function shadowRender(node: HTMLElement, html: string | undefined) {
-		if (html === undefined) return;
-
-		const shadow = node.attachShadow({ mode: 'open' });
-		const style = document.createElement('style');
-		style.textContent = `em { background-color: #fde047; font-style: normal; color: #1f2937; }`;
-		shadow.appendChild(style);
-		const content = document.createElement('div');
-		content.innerHTML = html;
-		shadow.appendChild(content);
-
-		return {
-			update(newHtml: string | undefined) {
-				if (newHtml === undefined) return;
-				content.innerHTML = newHtml;
-			},
-		};
-	}
 
 	function buildSearchParams(): URLSearchParams {
 		const params = new URLSearchParams();
@@ -198,9 +166,26 @@
 	}
 
 	function handleFacetClick(field: string, value: string) {
-		if (field === 'from') filterFrom = value;
-		else if (field === 'hasAttachments') filterHasAttachments = value === 'true';
-		else if (field === 'path') filterPath = value;
+		// Toggle: clicking the active facet deselects it
+		if (field === 'from') {
+			filterFrom = filterFrom === value ? '' : value;
+		} else if (field === 'hasAttachments') {
+			const boolVal = value === 'true';
+			filterHasAttachments = filterHasAttachments === boolVal ? false : boolVal;
+		} else if (field === 'path') {
+			filterPath = filterPath === value ? '' : value;
+		}
+		handleSearch();
+	}
+
+	function handleRemoveFilter(field: string) {
+		if (field === 'from') filterFrom = '';
+		else if (field === 'to') filterTo = '';
+		else if (field === 'dateFrom') filterDateFrom = '';
+		else if (field === 'dateTo') filterDateTo = '';
+		else if (field === 'hasAttachments') filterHasAttachments = false;
+		else if (field === 'path') filterPath = '';
+		else if (field === 'attachmentsOnly') attachmentsOnly = false;
 		handleSearch();
 	}
 
@@ -229,84 +214,14 @@
 		handleSearch();
 	}
 
-	function getHighlightedSnippets(text: string | undefined, snippetLength = 80): string[] {
-		if (!text || !text.includes('<em>')) {
-			return [];
-		}
-
-		const snippets: string[] = [];
-		const regex = /<em>.*?<\/em>/g;
-		let match;
-		let lastIndex = 0;
-
-		while ((match = regex.exec(text)) !== null) {
-			if (match.index < lastIndex) {
-				continue;
-			}
-
-			const matchIndex = match.index;
-			const matchLength = match[0].length;
-
-			const start = Math.max(0, matchIndex - snippetLength);
-			const end = Math.min(text.length, matchIndex + matchLength + snippetLength);
-
-			lastIndex = end;
-
-			let snippet = text.substring(start, end);
-
-			const openCount = (snippet.match(/<em/g) || []).length;
-			const closeCount = (snippet.match(/<\/em>/g) || []).length;
-
-			if (openCount > closeCount) {
-				snippet += '</em>';
-			}
-
-			if (closeCount > openCount) {
-				snippet = '<em>' + snippet;
-			}
-
-			if (start > 0) {
-				snippet = '...' + snippet;
-			}
-			if (end < text.length) {
-				snippet += '...';
-			}
-
-			snippets.push(snippet);
-		}
-
-		return snippets;
-	}
-
-	function getMatchCounts(hit: SearchHit): { body: number; attachments: number } {
-		const pos = hit._matchesPosition;
-		if (!pos) return { body: 0, attachments: 0 };
-
-		let body = 0;
-		let attachments = 0;
-
-		for (const key of Object.keys(pos)) {
-			const count = pos[key].length;
-			if (key.startsWith('attachments')) {
-				attachments += count;
-			} else if (key === 'body') {
-				body += count;
-			}
-		}
-
-		return { body, attachments };
-	}
-
-	function toggleSnippetExpand(hitId: string) {
-		expandedSnippets = new Set(expandedSnippets);
-		if (expandedSnippets.has(hitId)) {
-			expandedSnippets.delete(hitId);
-		} else {
-			expandedSnippets.add(hitId);
-		}
-	}
-
-	const SNIPPET_LIMIT = 2;
+	// Derive available paths from facet distribution for folder dropdown
+	const availablePaths = $derived.by(() => {
+		const dist = searchResult?.facetDistribution?.path;
+		if (!dist) return [];
+		return Object.entries(dist)
+			.sort(([, a], [, b]) => b - a)
+			.map(([path]) => path);
+	});
 </script>
 
 <svelte:head>
@@ -338,12 +253,11 @@
 
 	<form onsubmit={(e) => handleSearch(e)} class="mb-4 flex flex-col space-y-2">
 		<div class="flex items-center gap-2">
-			<Input
-				type="search"
-				name="keywords"
-				placeholder={$t('app.search.placeholder')}
-				class="h-12 flex-grow"
-				bind:value={keywords}
+			<SearchSuggestions
+				bind:query={keywords}
+				{savedSearches}
+				onSelect={(id) => goto(`/dashboard/archived-emails/${id}`)}
+				onSearch={() => handleSearch()}
 			/>
 			<Button type="submit" class="h-12 cursor-pointer"
 				>{$t('app.search.search_button')}</Button
@@ -407,10 +321,23 @@
 			bind:hasAttachments={filterHasAttachments}
 			bind:path={filterPath}
 			bind:expanded={filtersExpanded}
+			{availablePaths}
 			onApply={handleFilterApply}
 			onClear={handleFilterClear}
 		/>
 	</div>
+
+	<!-- Active filter chips -->
+	<ActiveFilterChips
+		from={filterFrom}
+		to={filterTo}
+		dateFrom={filterDateFrom}
+		dateTo={filterDateTo}
+		hasAttachments={filterHasAttachments}
+		path={filterPath}
+		{attachmentsOnly}
+		onRemove={handleRemoveFilter}
+	/>
 
 	{#if error}
 		<Alert.Root variant="destructive">
@@ -436,178 +363,21 @@
 		<div class="flex flex-col gap-6 lg:flex-row">
 			<!-- Results column -->
 			<div class="min-w-0 flex-1">
-				<div class="grid gap-4">
-					{#each searchResult.hits as hit}
-						{@const _formatted = hit._formatted || {}}
-						{@const matchCounts = getMatchCounts(hit)}
-						{@const bodySnippets = getHighlightedSnippets(_formatted.body)}
-						{@const attachmentSnippets = (_formatted.attachments || []).flatMap(
-							(att, i) =>
-								att && att.content
-									? getHighlightedSnippets(att.content).map((s) => ({
-											snippet: s,
-											filename: att.filename,
-										}))
-									: []
-						)}
-						{@const isExpanded = expandedSnippets.has(hit.id)}
-						{@const visibleBodySnippets = isExpanded
-							? bodySnippets
-							: bodySnippets.slice(0, SNIPPET_LIMIT)}
-						{@const visibleAttachmentSnippets = isExpanded
-							? attachmentSnippets
-							: attachmentSnippets.slice(0, SNIPPET_LIMIT)}
-						{@const hasMoreSnippets =
-							bodySnippets.length > SNIPPET_LIMIT ||
-							attachmentSnippets.length > SNIPPET_LIMIT}
-						<a href="/dashboard/archived-emails/{hit.id}" class="block">
-							<Card>
-								<CardHeader>
-									<CardTitle>
-										{#if !isMounted}
-											<Skeleton class="h-6 w-3/4" />
-										{:else}
-											<div
-												use:shadowRender={_formatted.subject || hit.subject}
-											></div>
-										{/if}
-									</CardTitle>
-									<CardDescription
-										class="divide-forground flex flex-wrap items-center space-x-2 divide-x"
-									>
-										<span class="pr-2">
-											<span>{$t('app.search.from')}:</span>
-											{#if !isMounted}
-												<span
-													class="bg-accent h-4 w-40 animate-pulse rounded-md"
-												></span>
-											{:else}
-												<span
-													class="inline-block"
-													use:shadowRender={_formatted.from || hit.from}
-												></span>
-											{/if}
-										</span>
-										<span class="pr-2">
-											<span>{$t('app.search.to')}:</span>
-											{#if !isMounted}
-												<span
-													class="bg-accent h-4 w-40 animate-pulse rounded-md"
-												></span>
-											{:else}
-												<span
-													class="inline-block"
-													use:shadowRender={_formatted.to?.join(', ') ||
-														hit.to.join(', ')}
-												></span>
-											{/if}
-										</span>
-										<span>
-											{#if !isMounted}
-												<span
-													class="bg-accent h-4 w-40 animate-pulse rounded-md"
-												></span>
-											{:else}
-												<span class="inline-block">
-													{new Date(hit.timestamp).toLocaleString()}
-												</span>
-											{/if}
-										</span>
-									</CardDescription>
-								</CardHeader>
-								<CardContent class="space-y-2">
-									<!-- Match count summary -->
-									{#if matchCounts.body > 0 || matchCounts.attachments > 0}
-										<p class="text-muted-foreground text-xs">
-											{#if matchCounts.body > 0}
-												{matchCounts.body === 1
-													? $t('app.search.match_count', {
-															count: matchCounts.body,
-															field: 'body',
-														} as any)
-													: $t('app.search.match_count_plural', {
-															count: matchCounts.body,
-															field: 'body',
-														} as any)}
-											{/if}
-											{#if matchCounts.body > 0 && matchCounts.attachments > 0}
-												{', '}
-											{/if}
-											{#if matchCounts.attachments > 0}
-												{matchCounts.attachments === 1
-													? $t('app.search.match_count', {
-															count: matchCounts.attachments,
-															field: 'attachments',
-														} as any)
-													: $t('app.search.match_count_plural', {
-															count: matchCounts.attachments,
-															field: 'attachments',
-														} as any)}
-											{/if}
-										</p>
-									{/if}
-
-									<!-- Body matches -->
-									{#each visibleBodySnippets as snippet}
-										<div
-											class="space-y-2 rounded-md bg-slate-100 p-2 dark:bg-slate-800"
-										>
-											<p class="text-sm text-gray-500">
-												{$t('app.search.in_email_body')}:
-											</p>
-											{#if !isMounted}
-												<Skeleton class="my-2 h-5 w-full bg-gray-200" />
-											{:else}
-												<p
-													class="font-mono text-sm"
-													use:shadowRender={snippet}
-												></p>
-											{/if}
-										</div>
-									{/each}
-
-									<!-- Attachment matches -->
-									{#each visibleAttachmentSnippets as { snippet, filename }}
-										<div
-											class="space-y-2 rounded-md bg-slate-100 p-2 dark:bg-slate-800"
-										>
-											<p class="text-sm text-gray-500">
-												{$t('app.search.in_attachment', {
-													filename,
-												} as any)}
-											</p>
-											{#if !isMounted}
-												<Skeleton class="my-2 h-5 w-full bg-gray-200" />
-											{:else}
-												<p
-													class="font-mono text-sm"
-													use:shadowRender={snippet}
-												></p>
-											{/if}
-										</div>
-									{/each}
-
-									<!-- Show more / less toggle -->
-									{#if hasMoreSnippets}
-										<button
-											type="button"
-											class="text-primary hover:text-primary/80 cursor-pointer text-xs font-medium"
-											onclick={(e) => {
-												e.preventDefault();
-												e.stopPropagation();
-												toggleSnippetExpand(hit.id);
-											}}
-										>
-											{isExpanded
-												? $t('app.search.show_less_snippets')
-												: $t('app.search.show_more_snippets')}
-										</button>
-									{/if}
-								</CardContent>
-							</Card>
-						</a>
-					{/each}
-				</div>
+				{#if searchResult.hits.length === 0}
+					<div class="flex flex-col items-center justify-center py-16 text-center">
+						<SearchIcon class="text-muted-foreground/40 mb-4 size-12" />
+						<h3 class="text-lg font-medium">{$t('app.search.no_results')}</h3>
+						<p class="text-muted-foreground mt-1 max-w-sm text-sm">
+							{$t('app.search.no_results_suggestion')}
+						</p>
+					</div>
+				{:else}
+					<div class="grid gap-2">
+						{#each searchResult.hits as hit (hit.id)}
+							<SearchResultCard {hit} {isMounted} />
+						{/each}
+					</div>
+				{/if}
 
 				{#if searchResult.total > searchResult.limit}
 					<div class="mt-8">
@@ -677,6 +447,11 @@
 							facetDistribution={searchResult.facetDistribution}
 							facetStats={searchResult.facetStats}
 							onFacetClick={handleFacetClick}
+							activeFilters={{
+								from: filterFrom,
+								hasAttachments: filterHasAttachments,
+								path: filterPath,
+							}}
 						/>
 					</div>
 				</div>

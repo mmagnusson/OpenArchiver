@@ -58,6 +58,33 @@ export class SearchController {
 	};
 
 	/**
+	 * GET /search/suggest — lightweight endpoint for search-as-you-type suggestions.
+	 * Returns max 5 results with minimal attributes. No audit logging.
+	 */
+	public suggest = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const userId = req.user?.sub;
+
+			if (!userId) {
+				res.status(401).json({ message: req.t('errors.unauthorized') });
+				return;
+			}
+
+			const query = (req.query.q as string) || '';
+			if (query.length < 2) {
+				res.status(200).json({ hits: [], processingTimeMs: 0 });
+				return;
+			}
+
+			const results = await this.searchService.suggestEmails(query, userId);
+			res.status(200).json(results);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : req.t('errors.unknown');
+			res.status(500).json({ message });
+		}
+	};
+
+	/**
 	 * POST /search/advanced — accepts structured JSON body for complex queries.
 	 * Supports filters, facets, sorting, and pagination.
 	 */

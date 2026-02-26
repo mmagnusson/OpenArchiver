@@ -51,6 +51,24 @@ export interface AdvancedSearchFilters {
 	ingestionSourceId?: string;
 	tags?: string[];
 	path?: string;
+	sizeMin?: number;
+	sizeMax?: number;
+}
+
+// --- Suggest Types ---
+
+export interface SuggestHit {
+	id: string;
+	subject: string;
+	from: string;
+	senderName: string;
+	timestamp: number;
+	hasAttachments: boolean;
+}
+
+export interface SuggestResult {
+	hits: SuggestHit[];
+	processingTimeMs: number;
 }
 
 export interface FacetDistribution {
