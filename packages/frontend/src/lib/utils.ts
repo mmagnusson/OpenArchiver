@@ -17,6 +17,21 @@ export function formatBytes(bytes: number, decimals = 2) {
 	return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+const FOLDER_PREFIXES_TO_STRIP = ['Top of Outlook data file/', 'Top of Personal Folders/'];
+
+/**
+ * Strip common PST root prefixes from folder paths for display.
+ * Returns the shortened name, or the original if no prefix matched.
+ */
+export function shortenFolderPath(fullPath: string): string {
+	for (const prefix of FOLDER_PREFIXES_TO_STRIP) {
+		if (fullPath.startsWith(prefix)) {
+			return fullPath.slice(prefix.length) || fullPath;
+		}
+	}
+	return fullPath;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, 'child'> : T;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

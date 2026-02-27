@@ -4,43 +4,38 @@ import type { PageServerLoad } from './$types';
 import type { ArchivedEmail, IntegrityCheckResult } from '@open-archiver/types';
 
 export const load: PageServerLoad = async (event) => {
-	try {
-		const { id } = event.params;
+	const { id } = event.params;
 
-		const [emailResponse, integrityResponse] = await Promise.all([
-			api(`/archived-emails/${id}`, event),
-			api(`/integrity/${id}`, event),
-		]);
+	// Fetch email — this is critical, fail hard if it doesn't work
+	const emailResponse = await api(`/archived-emails/${id}`, event);
 
-		if (!emailResponse.ok) {
-			const responseText = await emailResponse.json();
-			return error(
-				emailResponse.status,
-				responseText.message || 'You do not have permission to read this email.'
-			);
-		}
-
-		if (!integrityResponse.ok) {
-			const responseText = await integrityResponse.json();
-			return error(
-				integrityResponse.status,
-				responseText.message || 'Failed to perform integrity check.'
-			);
-		}
-
-		const email: ArchivedEmail = await emailResponse.json();
-		const integrityReport: IntegrityCheckResult[] = await integrityResponse.json();
-
-		return {
-			email,
-			integrityReport,
-		};
-	} catch (e) {
-		console.error('Failed to load archived email:', e);
-		return {
-			email: null,
-			integrityReport: [],
-			error: 'Failed to load email',
-		};
+	if (!emailResponse.ok) {
+		const responseText = await emailResponse.json().catch(() => ({ message: '' }));
+		error(
+			emailResponse.status,
+			responseText.message || 'You do not have permission to read this email.'
+		);
 	}
+
+	const email: ArchivedEmail = await emailResponse.json();
+
+	// Fetch integrity check separately — don't block email display if this fails
+	let integrityReport: IntegrityCheckResult[] = [];
+	try {
+		const integrityResponse = await api(`/integrity/${id}`, event);
+		if (integrityResponse.ok) {
+			integrityReport = await integrityResponse.json();
+		} else {
+			console.error(
+				`Integrity check failed for email ${id}: HTTP ${integrityResponse.status}`
+			);
+		}
+	} catch (e) {
+		console.error(`Integrity check error for email ${id}:`, e);
+	}
+
+	return {
+		email,
+		integrityReport,
+	};
 };

@@ -4,6 +4,7 @@
 	import { t } from '$lib/translations';
 	import type { FacetDistribution, FacetStats } from '@open-archiver/types';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import { shortenFolderPath } from '$lib/utils';
 
 	let {
 		facetDistribution,
@@ -179,6 +180,7 @@
 						{@const active = isActive('path', folder)}
 						<button
 							type="button"
+							title={folder}
 							class="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1 text-sm transition-colors {active
 								? 'bg-primary/10 text-primary font-medium'
 								: 'hover:bg-accent'}"
@@ -186,7 +188,7 @@
 						>
 							<span class="mr-2 flex items-center gap-1 truncate">
 								{#if active}<CheckIcon class="size-3 shrink-0" />{/if}
-								{folder}
+								{shortenFolderPath(folder)}
 							</span>
 							<Badge variant={active ? 'default' : 'secondary'}>{count}</Badge>
 						</button>

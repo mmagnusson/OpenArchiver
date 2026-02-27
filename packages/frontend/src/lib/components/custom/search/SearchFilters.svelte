@@ -5,6 +5,7 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Select from '$lib/components/ui/select';
 	import { t } from '$lib/translations';
+	import { shortenFolderPath } from '$lib/utils';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -157,15 +158,20 @@
 						<div class="flex gap-1">
 							<Select.Root type="single" bind:value={path}>
 								<Select.Trigger class="flex-1 cursor-pointer">
-									{path || $t('app.search.select_folder')}
+									{path
+										? shortenFolderPath(path)
+										: $t('app.search.select_folder')}
 								</Select.Trigger>
 								<Select.Content>
 									<Select.Item value="" label={$t('app.search.select_folder')}>
 										{$t('app.search.select_folder')}
 									</Select.Item>
 									{#each availablePaths as folderPath}
-										<Select.Item value={folderPath} label={folderPath}>
-											{folderPath}
+										<Select.Item
+											value={folderPath}
+											label={shortenFolderPath(folderPath)}
+										>
+											{shortenFolderPath(folderPath)}
 										</Select.Item>
 									{/each}
 								</Select.Content>

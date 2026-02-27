@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import { t } from '$lib/translations';
+	import { shortenFolderPath } from '$lib/utils';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	let {
@@ -48,7 +49,11 @@
 				value: '',
 			});
 		if (path)
-			result.push({ field: 'path', label: $t('app.search.filter_folder'), value: path });
+			result.push({
+				field: 'path',
+				label: $t('app.search.filter_folder'),
+				value: shortenFolderPath(path),
+			});
 		if (attachmentsOnly)
 			result.push({
 				field: 'attachmentsOnly',

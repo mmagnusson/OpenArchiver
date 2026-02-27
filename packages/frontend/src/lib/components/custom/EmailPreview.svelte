@@ -12,6 +12,7 @@
 
 	let parsedEmail: Email | null = $state(null);
 	let isLoading = $state(true);
+	let parseError: string | null = $state(null);
 
 	// By adding a <base> tag, all relative and absolute links in the HTML document
 	// will open in a new tab by default.
@@ -28,20 +29,37 @@
 		return null;
 	});
 
+	function toUint8Array(input: Buffer | { type: 'Buffer'; data: number[] }): Uint8Array | null {
+		try {
+			if (input && typeof input === 'object' && 'type' in input && input.type === 'Buffer') {
+				if (!Array.isArray(input.data) || input.data.length === 0) return null;
+				return new Uint8Array(input.data);
+			}
+			// ArrayBuffer, Buffer, or Uint8Array-like
+			const arr = new Uint8Array(input as Buffer);
+			if (arr.length === 0) return null;
+			return arr;
+		} catch {
+			return null;
+		}
+	}
+
 	$effect(() => {
 		async function parseEmail() {
 			if (raw) {
 				try {
-					let buffer: Uint8Array;
-					if ('type' in raw && raw.type === 'Buffer') {
-						buffer = new Uint8Array(raw.data);
-					} else {
-						buffer = new Uint8Array(raw as Buffer);
+					const buffer = toUint8Array(raw);
+					if (!buffer) {
+						parseError = 'Empty or invalid email data';
+						isLoading = false;
+						return;
 					}
 					const parsed = await new PostalMime().parse(buffer);
 					parsedEmail = parsed;
+					parseError = null;
 				} catch (error) {
 					console.error('Failed to parse email:', error);
+					parseError = error instanceof Error ? error.message : 'Unknown parsing error';
 				} finally {
 					isLoading = false;
 				}
@@ -62,6 +80,8 @@
 			srcdoc={emailHtml()}
 			class="h-[600px] w-full border-none"
 		></iframe>
+	{:else if parseError}
+		<p class="text-red-600">{$t('app.components.email_preview.render_error')}: {parseError}</p>
 	{:else if raw}
 		<p>{$t('app.components.email_preview.render_error')}</p>
 	{:else}

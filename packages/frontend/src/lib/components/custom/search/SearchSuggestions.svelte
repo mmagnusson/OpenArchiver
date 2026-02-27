@@ -27,7 +27,6 @@
 	let liveResults = $state<SuggestHit[]>([]);
 	let selectedIndex = $state(-1);
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-	let inputEl: HTMLInputElement | undefined = $state();
 
 	// Filter recent searches by prefix
 	const recentMatches = $derived.by(() => {
@@ -176,7 +175,6 @@
 		placeholder={$t('app.search.placeholder')}
 		class="h-12"
 		bind:value={query}
-		bind:ref={inputEl}
 		oninput={handleInput}
 		onkeydown={handleKeydown}
 		onfocus={handleFocus}
